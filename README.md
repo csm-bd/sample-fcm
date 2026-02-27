@@ -38,41 +38,44 @@ flutter pub get
 ```
 ## Step 4: Create Firebase Project
 - Go to: https://console.firebase.google.com
-- Click Create Project
-- Give project name
-- Disable Google Analytics (optional)
-- Click Create
+- Click Create a new Firebase project
+- Enter your project name and continue
+- Enable AI assistance for your project and continue
+- Disable Google Analytics for your project (Optional)
+- Click Create Project and continue
 
 ### 🤖 ANDROID CONFIGURATION
 ## Step 5: Add Android App to Firebase
-- Click Add App → Android
-- Package name:
+- In your project on Firebase, Click + Add App
+- Click on Android Icon from the platform row
+- Add Android package name
 ```bash
-com.example.sample_fcm
+com.codecraft.fcm
 ```
-(Must match android/app/src/main/AndroidManifest.xml)
+(Must match android/app/build.gradle.kts)
+- Add app nickname (Optional)
+- Click on Register App button
 - Download google-services.json
 - Place it inside:
 ```bash
 android/app/google-services.json
 ```
-## Step 6: Configure Android Gradle
+- Click Next to continue
+- Add Firebase SDK to your proejct
+- Click Next and Next
+- Done
+
+## Step 6: Add Firebase SDK
 - android/settings.gradle
 ```bash
 plugins{
-    id "com.google.gms.google-services" version "4.3.15" apply false
+    id("com.google.gms.google-services") version "4.3.15" apply false
 }
 ```
 - android/app/build.gradle
 ```bash
 plugins {
-    id 'com.google.gms.google-services'
-}
-```
-```bash
-dependencies {
-implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
-implementation("com.google.firebase:firebase-analytics")
+    id("com.google.gms.google-services")
 }
 ```
 ## Step 7: Android Notification Permission (Android 13+)
@@ -80,19 +83,80 @@ implementation("com.google.firebase:firebase-analytics")
 ```bash
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 ```
-
 ### 🍎 iOS CONFIGURATION
 ## Step 8: Add iOS App to Firebase
-- Click Add App → iOS
+- Click + Add App
+- Click on iOS Icon from the platform row
+- Add Apple bundle id
 - Bundle ID must match:
 ```bash
-ios/Runner.xcodeproj → General → Bundle Identifier
+ios/Runner.xcodeproj → General → Identity → Bundle Identifier
 ```
+- Add App nickname (Optional)
+- Click on Register App
 - Download GoogleService-Info.plist
 - Add inside:
 ```bash 
 ios/Runner/
 ```
+- Click Next (No need to add Firebase SDK)
+- Add initialization code in AppDelegate.swift
+```bash
+ios/Runner/AppDelegate.swift
+```
+- Example Code
+```dart
+import UIKit
+import Flutter
+import FirebaseCore
+import FirebaseMessaging
+import UserNotifications
+
+@main
+@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate {
+
+    override func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        FirebaseApp.configure()
+        Messaging.messaging().delegate = self
+        UNUserNotificationCenter.current().delegate = self
+        
+        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+        UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
+            if let error = error {
+                print("Notification permission error: \(error)")
+            }
+        }
+        application.registerForRemoteNotifications()
+        GeneratedPluginRegistrant.register(with: self)
+        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+    override func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        Messaging.messaging().appDidReceiveMessage(userInfo)
+        completionHandler(.newData)
+    }
+    override func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Messaging.messaging().apnsToken = deviceToken
+        super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+        print("APNs device token registered: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
+    }
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        print("Firebase registration token: \(String(describing: fcmToken))")
+        
+    }
+}
+```
+- Click Next, Done!
+
 ## STEP 9: Enable Capabilities in Xcode
 Open in Xcode:
 ```bash
