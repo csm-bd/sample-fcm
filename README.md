@@ -59,16 +59,21 @@ android/app/google-services.json
 ## Step 6: Configure Android Gradle
 - android/settings.gradle
 ```bash
-plugins id "com.google.gms.google-services" version "4.3.15" apply false
+plugins{
+    id "com.google.gms.google-services" version "4.3.15" apply false
+}
 ```
 - android/app/build.gradle
 ```bash
-plugins id 'com.google.gms.google-services'
+plugins {
+    id 'com.google.gms.google-services'
+}
 ```
 ```bash
-dependencies
+dependencies {
 implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
 implementation("com.google.firebase:firebase-analytics")
+}
 ```
 ## Step 7: Android Notification Permission (Android 13+)
 - Add in: android/app/src/main/AndroidManifest.xml
