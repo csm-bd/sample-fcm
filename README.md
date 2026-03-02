@@ -36,6 +36,44 @@ dependencies:
 ```bash
 flutter pub get
 ```
+### 🔧 Fix: flutter_local_notifications Requires Core Library Desugaring (Android)
+When building the project, you may encounter this error:
+```bash
+Execution failed for task ':app:checkDebugAarMetadata'.
+Dependency ':flutter_local_notifications' requires core library desugaring to be enabled.
+```
+This happens because flutter_local_notifications uses newer Java 8+ APIs that require Core Library Desugaring for Android.
+#### Let's fix this issue
+- Open Android App Build File
+```bash
+android/app/build.gradle.kts
+```
+- Enable Core Library Desugaring
+- Inside the android {} block, update or add the following:
+```bash
+compileOptions {
+    isCoreLibraryDesugaringEnabled = true
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+kotlinOptions {
+    jvmTarget = "17"
+}
+```
+- Add Desugaring Dependency
+- At the bottom of the same file (outside the android {} block), add:
+```bash
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+}
+```
+- Clean and Rebuild the Project
+```bash
+flutter clean
+flutter pub get
+flutter run
+```
 ## Step 4: Create Firebase Project
 - Go to: https://console.firebase.google.com
 - Click Create a new Firebase project
@@ -169,9 +207,9 @@ Go to:
 - Apple Developer Account
 - Create APNs Auth Key or Use Existing Key
 - Download .p8 file
-- Go to Firebase →
-- Project Settings →
-- Cloud Messaging →
+- Go to Firebase
+- Click on your project settings icon
+- Then Go To Cloud Messaging Tab
 - Upload APNs key
 
 ## STEP 11: Flutter Implementation
@@ -193,7 +231,7 @@ lib
                 ├── bloc
                 └── pages
 ```
-- Initialize Firebase Properly
+- Initialize Firebase Globally
 ```dart
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -208,7 +246,331 @@ void main() async {
   runApp(const MainApp());
 }
 ```
-## STEP 00: Sending Push Notification from Firebase Console
+- Add Equatable Package to Your Project.
+```bash
+flutter pub add equatable
+```
+### 📦 DOMAIN LAYER
+- Create Notification Entity
+```bash
+domain/entities/notification.dart
+```
+```dart
+class NotificationEntity extends Equatable {
+  final String guid;
+  final String title;
+  final String body;
+  final Map<String, dynamic> data;
+
+  const NotificationEntity({
+    required this.guid,
+    required this.title,
+    required this.body,
+    required this.data,
+  });
+
+  @override
+  List<Object?> get props => [guid, title, body, data];
+}
+```
+- Create Notification Repository
+```bash
+domain/repositories/notification.dart
+```
+```dart
+abstract class NotificationRepository {
+  Future<void> requestPermission();
+  Future<String?> getDeviceToken();
+  Stream<String> get tokenRefreshStream;
+  Stream<NotificationEntity> get onForegroundNotification;
+  Future<void> initialize();
+}
+```
+- Create Usecases
+```bash
+domain/usecases/notification.dart
+```
+- Request Permission Usecase
+```dart
+class RequestNotificationPermissionUseCase {
+  final NotificationRepository repository;
+
+  const RequestNotificationPermissionUseCase({required this.repository});
+
+  Future<void> call() => repository.requestPermission();
+}
+```
+- Get Token Usecase
+```dart
+class GetDeviceTokenUseCase {
+  final NotificationRepository repository;
+
+  const GetDeviceTokenUseCase({required this.repository});
+
+  Future<String?> call() => repository.getDeviceToken();
+}
+```
+- Initialize Usecase
+```dart
+class InitializeNotificationsUseCase {
+  final NotificationRepository repository;
+
+  const InitializeNotificationsUseCase({required this.repository});
+
+  Future<void> call() => repository.initialize();
+}
+```
+### 📦 DATA LAYER
+- Create Remote Data Source
+```bash
+data/datasources/remote.dart
+```
+```dart
+abstract class NotificationRemoteDataSource {
+  Future<void> requestPermission();
+  Future<String?> getToken();
+  Stream<String> get tokenRefreshStream;
+  Stream<NotificationEntity> get onForegroundNotification;
+  Future<void> initialize();
+}
+```
+- Implement Remote Data Source
+```bash
+data/datasources/remote_impl.dart
+```
+```dart
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:sample_fcm/features/notifications/data/datasources/remote.dart';
+
+class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
+  final FirebaseMessaging messaging;
+  final FlutterLocalNotificationsPlugin localNotifications;
+
+  NotificationRemoteDataSourceImpl({
+    required this.messaging,
+    required this.localNotifications,
+  });
+
+  @override
+  Future<void> requestPermission() async {
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
+  }
+
+  @override
+  Future<String?> getToken() async {
+    try {
+      await requestPermission();
+
+      await Future.delayed(const Duration(seconds: 2));
+
+      String? token = await messaging.getToken();
+
+      token ??= await messaging.onTokenRefresh.first;
+
+      debugPrint('FCM/APNs Token: $token');
+      return token;
+    } catch (e) {
+      debugPrint('getToken() failed: $e');
+      return null;
+    }
+  }
+
+  @override
+  Stream<String> get tokenRefreshStream => messaging.onTokenRefresh;
+
+  @override
+  Stream<NotificationEntity> get onForegroundNotification =>
+      FirebaseMessaging.onMessage.map((message) {
+        return NotificationEntity(
+          guid: message.messageId.toString(),
+          title: message.notification?.title ?? '',
+          body: message.notification?.body ?? '',
+          data: message.data,
+        );
+      });
+
+  @override
+  Future<void> initialize() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    final iosInit = const DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    final initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
+
+    await localNotifications.initialize(
+      settings: initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        debugPrint('Notification tapped: ${response.payload}');
+      },
+    );
+
+    const channel = AndroidNotificationChannel(
+      'high_importance_channel',
+      'High Importance Notifications',
+      description: 'Used for important notifications.',
+      importance: Importance.max,
+    );
+
+    await localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(channel);
+
+    FirebaseMessaging.onMessage.listen((message) async {
+      await localNotifications.show(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: message.notification?.title,
+        body: message.notification?.body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'high_importance_channel',
+            'High Importance Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    });
+  }
+}
+```
+- Implement Repository
+```bash
+data/repositories/notification.dart
+```
+```dart
+import 'package:sample_fcm/features/notifications/data/datasources/remote.dart';
+import 'package:sample_fcm/features/notifications/domain/repositories/notification.dart';
+
+class NotificationRepositoryImpl implements NotificationRepository {
+  final NotificationRemoteDataSource remote;
+
+  NotificationRepositoryImpl({required this.remote});
+
+  @override
+  Future<void> requestPermission() => remote.requestPermission();
+
+  @override
+  Future<String?> getDeviceToken() => remote.getToken();
+
+  @override
+  Stream<String> get tokenRefreshStream => remote.tokenRefreshStream;
+
+  @override
+  Stream<NotificationEntity> get onForegroundNotification =>
+      remote.onForegroundNotification;
+
+  @override
+  Future<void> initialize() => remote.initialize();
+}
+```
+### 📦 PRESENTATION LAYER (BLoC)
+- Notification State
+```dart
+sealed class NotificationState extends Equatable {
+  const NotificationState();
+
+  @override
+  List<Object?> get props => [];
+}
+
+final class NotificationInitial extends NotificationState {
+  const NotificationInitial();
+}
+
+class NotificationReady extends NotificationState {
+  final String? token;
+
+  const NotificationReady(this.token);
+}
+
+class NotificationLoaded extends NotificationState {
+  final NotificationEntity notification;
+
+  const NotificationLoaded({required this.notification});
+}
+```
+- Notification Event
+```dart
+sealed class NotificationEvent extends Equatable {
+  const NotificationEvent();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class InitializeNotification extends NotificationEvent {}
+
+class NotificationReceived extends NotificationEvent {
+  final NotificationEntity notification;
+
+  const NotificationReceived({required this.notification});
+}
+```
+- Notification Bloc
+```dart
+class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
+  final InitializeNotificationsUseCase initialize;
+  final RequestNotificationPermissionUseCase requestPermission;
+  final GetDeviceTokenUseCase getDeviceToken;
+
+  NotificationBloc({
+    required this.initialize,
+    required this.requestPermission,
+    required this.getDeviceToken,
+  }) : super(const NotificationInitial()) {
+    debugPrint('NotificationBloc initialized');
+    on<InitializeNotification>(_onInitialize);
+    on<NotificationReceived>(_onNotificationReceived);
+  }
+
+  Future<void> _onInitialize(
+    InitializeNotification event,
+    Emitter<NotificationState> emit,
+  ) async {
+    try {
+      await initialize();
+      await requestPermission();
+
+      FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+        debugPrint('FCM token refreshed: $token');
+        emit(NotificationReady(token));
+      });
+
+      // await Future.delayed(const Duration(seconds: 3));
+
+      final token = await getDeviceToken();
+      if (token != null) {
+        debugPrint('FCM token immediately available: $token');
+        emit(NotificationReady(token));
+      } else {
+        debugPrint(
+          'Device token not yet available, waiting for onTokenRefresh...',
+        );
+      }
+    } catch (e, st) {
+      debugPrint('Error in _onInitialize: $e\n$st');
+    }
+  }
+
+  void _onNotificationReceived(NotificationReceived event, Emitter emit) {
+    debugPrint('NotificationReceived');
+    emit(NotificationReceived(notification: event.notification));
+  }
+}
+```
+## STEP 12: Sending Push Notification from Firebase Console
 - Go to Firebase Console
 - Go to Run > Messaging
 - Create Your First Campaign > Push Notification
@@ -224,7 +586,7 @@ void main() async {
 - Generate New Private Key
 - Download JSON file.
 
-## STEP 00: Generate Oauth Access Token using Google Cloud SDK
+## STEP 13: Generate Oauth Access Token using Google Cloud SDK
 - Install Google Cloud SDK
 ```bash
 brew install --cask google-cloud-sdk
@@ -247,7 +609,7 @@ gcloud auth print-access-token
 ```bash
 Authorization: Bearer YOUR_TOKEN_HERE
 ```
-## STEP 00: Postman Request
+## STEP 14: Postman Request
 - URL:
 ```bash
 POST https://fcm.googleapis.com/v1/projects/YOUR_PROJECT_ID/messages:send
@@ -269,4 +631,4 @@ Content-Type: application/json
   }
 }
 ```
-- Click Send
+- Click Send 
