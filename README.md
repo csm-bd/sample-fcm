@@ -155,8 +155,6 @@ import UserNotifications
     }
 }
 ```
-- Click Next, Done!
-
 ## STEP 9: Enable Capabilities in Xcode
 Open in Xcode:
 ```bash
@@ -164,8 +162,8 @@ ios/Runner.xcworkspace
 ```
 Go to:
 - Signing & Capabilities →
-- Enable: Push Notifications (+Capability)
-- Enable: Background Modes → Remote notifications (+Capability)
+- Enable: Push Notifications (+ Capability)
+- Enable: Background Modes → Remote notifications (+ Capability)
 
 ## STEP 10: Upload APNs Key to Firebase
 - Apple Developer Account
@@ -176,7 +174,40 @@ Go to:
 - Cloud Messaging →
 - Upload APNs key
 
-## STEP 11: Flutter Implementation (TODO)
+## STEP 11: Flutter Implementation
+We will implement push notification in Flutter using BLoc and Clean Architecture.
+- Create notification features inside lib
+```bash
+lib
+└── features
+        └── notifications
+            ├── data
+            │   ├── datasources
+            │   ├── models
+            │   └── repositories
+            ├── domain
+            │   ├── entities
+            │   ├── repositories
+            │   └── usecases
+            └── presentation
+                ├── bloc
+                └── pages
+```
+- Initialize Firebase Properly
+```dart
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint("Handling background message: ${message.messageId}");
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  runApp(const MainApp());
+}
+```
 ## STEP 00: Sending Push Notification from Firebase Console
 - Go to Firebase Console
 - Go to Run > Messaging
