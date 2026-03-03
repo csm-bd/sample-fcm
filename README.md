@@ -78,8 +78,8 @@ flutter run
 - Go to: https://console.firebase.google.com
 - Click Create a new Firebase project
 - Enter your project name and continue
-- Enable AI assistance for your project and continue
-- Disable Google Analytics for your project (Optional)
+- Disable AI assistance for your project (Optional)
+- Enable Google Analytics for your project
 - Click Create Project and continue
 
 ### 🤖 ANDROID CONFIGURATION
@@ -339,11 +339,6 @@ abstract class NotificationRemoteDataSource {
 data/datasources/remote_impl.dart
 ```
 ```dart
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:sample_fcm/features/notifications/data/datasources/remote.dart';
-
 class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   final FirebaseMessaging messaging;
   final FlutterLocalNotificationsPlugin localNotifications;
@@ -450,9 +445,6 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
 data/repositories/notification.dart
 ```
 ```dart
-import 'package:sample_fcm/features/notifications/data/datasources/remote.dart';
-import 'package:sample_fcm/features/notifications/domain/repositories/notification.dart';
-
 class NotificationRepositoryImpl implements NotificationRepository {
   final NotificationRemoteDataSource remote;
 
@@ -668,13 +660,16 @@ void main() async {
   ```
 ## STEP 12: Sending Push Notification from Firebase Console
 - Go to Firebase Console
-- Go to Run > Messaging
-- Create Your First Campaign > Push Notification
+- Go to Your Desired Project
+- Open Project Settings
+- Go to Run > Messaging from the Left Sidebar
+- Create Your First Campaign
+- Select Firebase Notification Message > Create
 - Enter: Title, Body, Select Target:
 - Complete Additional Steps
-- Click Send
+- Review & Publish
 
-## STEP 00: Sending Push Notification using Postman (HTTP v1)
+## STEP 13: Sending Push Notification using Postman (HTTP v1)
 - Go to:
 - Firebase →
 - Project Settings →
@@ -682,7 +677,7 @@ void main() async {
 - Generate New Private Key
 - Download JSON file.
 
-## STEP 13: Generate Oauth Access Token using Google Cloud SDK
+## STEP 14: Generate Oauth Access Token using Google Cloud SDK
 - Install Google Cloud SDK
 ```bash
 brew install --cask google-cloud-sdk

@@ -21,7 +21,10 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("FCM Sample")),
+      appBar: AppBar(
+        backgroundColor: Colors.orangeAccent,
+        title: const Text("Home Page"),
+      ),
       body: BlocBuilder<NotificationBloc, NotificationState>(
         builder: (context, state) {
           if (state is NotificationInitial) {
