@@ -547,9 +547,6 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         debugPrint('FCM token refreshed: $token');
         emit(NotificationReady(token));
       });
-
-      // await Future.delayed(const Duration(seconds: 3));
-
       final token = await getDeviceToken();
       if (token != null) {
         debugPrint('FCM token immediately available: $token');
@@ -570,6 +567,105 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   }
 }
 ```
+### 🔔 FCM Dependency Injection Setup
+- Install Required Package
+```bash
+get_it: ^latest
+```
+- Then run:
+```bash
+flutter pub get
+```
+- Create Injection File
+```bash
+lib/core/dependencies/injection.dart
+```
+- Configure Get It
+```dart
+final sl = GetIt.instance;
+
+Future<void> init() async {
+
+  //! ----------------- External Dependencies -----------------
+
+  sl.registerLazySingleton<FirebaseMessaging>(
+    () => FirebaseMessaging.instance,
+  );
+
+  sl.registerLazySingleton<FlutterLocalNotificationsPlugin>(
+    () => FlutterLocalNotificationsPlugin(),
+  );
+
+  //! ----------------- Data Sources -----------------
+
+  sl.registerLazySingleton<NotificationRemoteDataSource>(
+    () => NotificationRemoteDataSourceImpl(
+      messaging: sl(),
+      localNotifications: sl(),
+    ),
+  );
+
+  //! ----------------- Repository -----------------
+
+  sl.registerLazySingleton<NotificationRepository>(
+    () => NotificationRepositoryImpl(
+      remote: sl(),
+    ),
+  );
+
+  //! ----------------- Use Cases -----------------
+
+  sl.registerFactory(
+    () => InitializeNotificationsUseCase(repository: sl()),
+  );
+
+  sl.registerFactory(
+    () => RequestNotificationPermissionUseCase(repository: sl()),
+  );
+
+  sl.registerFactory(
+    () => GetDeviceTokenUseCase(repository: sl()),
+  );
+
+  //! ----------------- Bloc -----------------
+
+  sl.registerFactory(
+    () => NotificationBloc(
+      initialize: sl(),
+      requestPermission: sl(),
+      getDeviceToken: sl(),
+    ),
+  );
+}
+```
+- Initialize Get It in main.dart
+```dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
+  await init(); // Initialize Get It
+
+  FirebaseMessaging.onBackgroundMessage(
+    _firebaseMessagingBackgroundHandler,
+  );
+
+  runApp(
+    BlocProvider(
+      create: (_) => sl<NotificationBloc>(),
+      child: const MainApp(),
+    ),
+  );
+}
+```
+- Trigger Notification Initialization in HomePage
+```dart
+ @override
+  void initState() {
+    super.initState();
+    context.read<NotificationBloc>().add(InitializeNotification());
+  }
+  ```
 ## STEP 12: Sending Push Notification from Firebase Console
 - Go to Firebase Console
 - Go to Run > Messaging
@@ -631,4 +727,4 @@ Content-Type: application/json
   }
 }
 ```
-- Click Send 
+- Click Send
