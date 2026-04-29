@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "125161439560",
+    "project_id": "fir-fcm-e92b0",
+    "storage_bucket": "fir-fcm-e92b0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:125161439560:android:8d483ccf3ae64da6d5737d",
+        "android_client_info": {
+          "package_name": "com.codecraft.fcm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5kcAvup7N50TfhjJYnvAIT531jE43R1o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
